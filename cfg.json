@@ -1,0 +1,27 @@
+{
+  "listen": "127.0.0.1:1153",
+  "timeout_ms": 500,
+  "resolvers": [
+    {"name": "8888", "type": "leaf", "addr": "8.8.8.8:53"},
+    {"name": "8844", "type": "leaf", "addr": "8.8.4.4:53"},
+    {"name": "114", "type": "leaf", "addr": "114.114.114.114:53"},
+    {"name": "ali", "type": "leaf", "addr": "223.6.6.6:53"},
+    {"name": "dnspod", "type": "leaf", "addr": "119.29.29.29:53"},
+    {"name": "8888-filter", "type": "gfw-filter", "child": "8888"},
+    {"name": "8844-filter", "type": "gfw-filter", "child": "8844"},
+    {"name": "114-filter", "type": "gfw-filter", "child": "114"},
+    {"name": "ali-filter", "type": "gfw-filter", "child": "ali"},
+    {"name": "dnspod-filter", "type": "gfw-filter", "child": "dnspod"},
+    {"name": "tunnel-8888", "type": "leaf", "addr": "127.0.0.1:5353"},
+    {
+      "name": "external", "type": "parallel",
+      "children": [
+        "tunnel-8888",
+        "8888-filter", "8844-filter",
+        "114-filter", "ali-filter", "dnspod-filter"
+      ]
+    },
+    {"name": "hosts", "type": "hosts"},
+    {"name": "root", "type": "chain", "children": ["hosts", "external"]}
+  ]
+}
