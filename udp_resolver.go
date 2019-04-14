@@ -7,7 +7,6 @@ import (
 	"github.com/account-login/ctxlog"
 	"github.com/pkg/errors"
 	dm "golang.org/x/net/dns/dnsmessage"
-	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -20,6 +19,7 @@ type UDPResolver struct {
 	conn    net.PacketConn
 	txid    uint32
 	txid2ch sync.Map
+	quit    int32
 	exited  chan struct{}
 }
 
@@ -55,11 +55,11 @@ func (r *UDPResolver) Start() error {
 	r.txid = binary.LittleEndian.Uint32(buf[:])
 
 	// init channels
-	r.exited = make(chan struct{}, 1)
+	r.exited = make(chan struct{}, 0)
 
 	// reader loop
 	go func() {
-		defer func() { r.exited <- struct{}{} }()
+		defer close(r.exited)
 
 		session := 0
 		buf := make([]byte, 64*1024)
@@ -69,13 +69,13 @@ func (r *UDPResolver) Start() error {
 
 			// read
 			n, addr, err := conn.ReadFrom(buf)
-			if err == io.EOF {
-				ctxlog.Infof(ctx, "UDPResolver EOF")
-				break
-			}
 			if err != nil {
 				ctxlog.Errorf(ctx, "UDPResolver ReadFrom: %v", err)
-				continue
+				if atomic.LoadInt32(&r.quit) != 0 {
+					break
+				} else {
+					continue
+				}
 			}
 
 			// parse
@@ -88,10 +88,11 @@ func (r *UDPResolver) Start() error {
 
 			// post
 			if v, ok := r.txid2ch.Load(m.ID); ok {
+				ctxlog.Debugf(ctx, "got msg from [remote:%v] %v", addr, ReprMessageShort(m))
 				ch := v.(chan *dm.Message)
 				select {
 				case ch <- m:
-					ctxlog.Debugf(ctx, "got msg from [remote:%v] %v", addr, ReprMessageShort(m))
+					// pass
 				default:
 					ctxlog.Errorf(ctx, "channel for [txid:%v] full. [remote:%v]", m.ID, addr)
 				}
@@ -107,6 +108,7 @@ func (r *UDPResolver) Start() error {
 }
 
 func (r *UDPResolver) Stop() {
+	atomic.StoreInt32(&r.quit, 1)
 	_ = r.conn.Close()
 	r.txid2ch.Range(func(key, value interface{}) bool { r.txid2ch.Delete(key); return true })
 }

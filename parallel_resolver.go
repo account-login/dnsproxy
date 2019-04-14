@@ -25,7 +25,7 @@ func (r *ParallelResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Me
 			defer func() {
 				cur := atomic.AddInt32(&remains, -1)
 				if cur == 0 {
-					ch <- nil // no result
+					close(ch) // no result
 				}
 			}()
 
