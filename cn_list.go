@@ -8272,5 +8272,5 @@ func isCNIPV4(ip net.IP) bool {
 	i := sort.Search(len(cnList), func(i int) bool {
 		return cnList[i][1] > n
 	})
-	return n >= cnList[i][0]
+	return i < len(cnList) && n >= cnList[i][0]
 }
