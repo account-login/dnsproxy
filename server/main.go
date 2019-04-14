@@ -44,8 +44,6 @@ type serverState struct {
 	listener net.Listener
 	// udp conn
 	conn net.PacketConn
-	// udp resolver
-	udpResolver *dnsproxy.UDPResolver
 
 	// for gracefull shutdown
 	quit       bool
@@ -91,12 +89,9 @@ func (s *serverState) close(ctx context.Context) {
 
 	safeClose(ctx, s.listener)
 	safeClose(ctx, s.conn)
-	s.udpResolver.Stop()
 }
 
 func (s *serverState) wait() {
-	s.udpResolver.Wait()
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for s.concurency != 0 {
@@ -104,9 +99,7 @@ func (s *serverState) wait() {
 	}
 }
 
-func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
-	defer state.dec()
-
+func initUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 	// listen for udp reply
 	err := server.UDPResolver.Start()
 	if err != nil {
@@ -119,6 +112,12 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 		ctxlog.Fatal(ctx, err)
 	}
 	ctxlog.Infof(ctx, "udp server listening on %v", state.conn.LocalAddr())
+}
+
+func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
+	defer state.dec()
+	defer server.UDPResolver.Wait()
+	defer server.UDPResolver.Stop()
 
 	// loop for udp client
 	buf := make([]byte, 64*1024)
@@ -185,9 +184,6 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 			}
 		}(addr)
 	} // loop for req
-
-	// shutdown
-	server.UDPResolver.Wait()
 }
 
 func safeClose(ctx context.Context, closer io.Closer) {
@@ -197,18 +193,20 @@ func safeClose(ctx context.Context, closer io.Closer) {
 	}
 }
 
-func doTCP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
-	defer state.dec()
-
+func initTCP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 	// listen
 	var err error
 	state.listener, err = net.Listen("tcp", server.Listen)
 	if err != nil {
 		ctxlog.Fatal(ctx, err)
 	}
-	defer safeClose(ctx, state.listener)
 
 	ctxlog.Infof(ctx, "tcp server listening on %v", state.listener.Addr())
+}
+
+func doTCP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
+	defer state.dec()
+	//defer safeClose(ctx, state.listener)
 
 	for {
 		ctx := ctxlog.Pushf(ctx, "[session:%v]", atomic.AddUint64(&state.session, 1))
@@ -334,15 +332,16 @@ func main() {
 
 	// shared state
 	state := newServerState()
-	state.udpResolver = &server.UDPResolver
 
 	// debug server
 	debugSrv := StartDebugServer(ctx, "127.0.0.1:6653")
 
 	// loop for tcp client
+	initTCP(ctx, server, state)
 	state.inc()
 	go doTCP(ctx, server, state)
 	// loop for udp client
+	initUDP(ctx, server, state)
 	state.inc()
 	go doUDP(ctx, server, state)
 
