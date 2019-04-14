@@ -47,26 +47,25 @@ type serverState struct {
 
 	// for gracefull shutdown
 	quit       bool
-	mu         sync.Mutex
-	cond       *sync.Cond
+	cond       sync.Cond
 	concurency int
 }
 
 func newServerState() *serverState {
 	s := &serverState{}
-	s.cond = sync.NewCond(&s.mu)
+	s.cond.L = &sync.Mutex{}
 	return s
 }
 
 func (s *serverState) inc() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
 	s.concurency += 1
 }
 
 func (s *serverState) dec() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
 	s.concurency -= 1
 	if s.concurency < 0 {
 		panic("s.concurency < 0")
@@ -77,23 +76,23 @@ func (s *serverState) dec() {
 }
 
 func (s *serverState) exiting() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
 	return s.quit
 }
 
 func (s *serverState) close(ctx context.Context) {
-	s.mu.Lock()
+	s.cond.L.Lock()
 	s.quit = true
-	s.mu.Unlock()
+	s.cond.L.Unlock()
 
 	safeClose(ctx, s.listener)
 	safeClose(ctx, s.conn)
 }
 
 func (s *serverState) wait() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
 	for s.concurency != 0 {
 		s.cond.Wait()
 	}
