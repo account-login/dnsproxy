@@ -40,7 +40,7 @@ func isPolluted(ip net.IP) bool {
 	return !isCNIPV4(ip)
 }
 
-func (r GFWFilterResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message, error) {
+func (r *GFWFilterResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message, error) {
 	res, err := r.Child.Resolve(ctx, req)
 	if err != nil {
 		return res, err
