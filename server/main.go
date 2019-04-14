@@ -313,6 +313,7 @@ func main() {
 
 	// args
 	cfgFilePtr := flag.String("c", "cfg.json", "config file")
+	debugServerPtr := flag.String("debug", "", "debug server addr")
 	flag.Parse()
 
 	// ctx
@@ -333,7 +334,10 @@ func main() {
 	state := newServerState()
 
 	// debug server
-	debugSrv := StartDebugServer(ctx, "127.0.0.1:6653")
+	var debugSrv *http.Server
+	if *debugServerPtr != "" {
+		debugSrv = StartDebugServer(ctx, *debugServerPtr)
+	}
 
 	// loop for tcp client
 	initTCP(ctx, server, state)
@@ -357,6 +361,8 @@ func main() {
 	state.wait()
 
 	//debugSrv.Shutdown(ctx)
-	safeClose(ctx, debugSrv)
+	if debugSrv != nil {
+		safeClose(ctx, debugSrv)
+	}
 	ctxlog.Infof(ctx, "exited. number of goroutine: %v", runtime.NumGoroutine())
 }
