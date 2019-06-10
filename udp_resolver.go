@@ -147,7 +147,7 @@ func (r *UDPResolver) Resolve(
 	// wait for response
 	select {
 	case <-ctx.Done():
-		ctxlog.Debugf(ctx, "abondond: %v", ctx.Err())
+		ctxlog.Debugf(ctx, "abandoned: %v", ctx.Err())
 		return nil, ctx.Err()
 	case res := <-ch:
 		// modify ID
