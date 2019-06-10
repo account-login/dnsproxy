@@ -45,10 +45,10 @@ func (r *GFWFilterResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.M
 	if err != nil {
 		return res, err
 	}
-	if len(res.Answers) != 1 {
-		return res, err
+	if len(res.Answers) == 0 {
+		return nil, ErrMaybePolluted
 	}
-	if isPolluted(rr2ip(&res.Answers[0])) {
+	if len(res.Answers) == 1 && isPolluted(rr2ip(&res.Answers[0])) {
 		return nil, ErrMaybePolluted
 	}
 	return res, err
