@@ -1,6 +1,6 @@
 // +build windows
 
-package dnsproxy
+package hosts
 
 import "os"
 

@@ -3,6 +3,7 @@ package dnsproxy
 import (
 	"context"
 	"github.com/account-login/ctxlog"
+	"github.com/account-login/dnsproxy/hosts"
 	dm "golang.org/x/net/dns/dnsmessage"
 	"net"
 )
@@ -19,7 +20,7 @@ func resolveHosts(ctx context.Context, q *dm.Question, rrList []dm.Resource) []d
 	switch q.Type {
 	case dm.TypeA, dm.TypeAAAA, dm.TypeALL:
 		qname := string(q.Name.Data[:q.Name.Length])
-		addrList := lookupStaticHost(qname)
+		addrList := hosts.LookupStaticHost(qname)
 		for _, addr := range addrList {
 			ip := net.ParseIP(addr)
 			if ip == nil {
@@ -44,7 +45,7 @@ func resolveHosts(ctx context.Context, q *dm.Question, rrList []dm.Resource) []d
 					Name:  q.Name,
 					Type:  ipType,
 					Class: q.Class,
-					TTL:   uint32(cacheMaxAge.Seconds()),
+					TTL:   uint32(hosts.CacheMaxAge.Seconds()),
 				},
 			}
 

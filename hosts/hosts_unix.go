@@ -1,5 +1,5 @@
 // +build linux darwin
 
-package dnsproxy
+package hosts
 
 var hostsPath = `/etc/hosts`

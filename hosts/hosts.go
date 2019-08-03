@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dnsproxy
+// copied from net/hosts.go
+
+package hosts
 
 import (
 	"bufio"
@@ -13,7 +15,7 @@ import (
 	"time"
 )
 
-const cacheMaxAge = 5 * time.Second
+const CacheMaxAge = 5 * time.Second
 
 func parseLiteralIP(addr string) string {
 	var ip net.IP
@@ -94,7 +96,7 @@ func readHosts() {
 	}
 	mtime, size, err := stat(hp)
 	if err == nil && hosts.path == hp && hosts.mtime.Equal(mtime) && hosts.size == size {
-		hosts.expire = now.Add(cacheMaxAge)
+		hosts.expire = now.Add(CacheMaxAge)
 		return
 	}
 
@@ -133,7 +135,7 @@ func readHosts() {
 	// ignore scanner error
 
 	// Update the data cache.
-	hosts.expire = now.Add(cacheMaxAge)
+	hosts.expire = now.Add(CacheMaxAge)
 	hosts.path = hp
 	hosts.byName = hs
 	hosts.byAddr = is
@@ -185,7 +187,7 @@ func countAnyByte(s string, t string) int {
 func getFields(s string) []string { return splitAtBytes(s, " \r\t\n") }
 
 // lookupStaticHost looks up the addresses for the given host from /etc/hosts.
-func lookupStaticHost(host string) []string {
+func LookupStaticHost(host string) []string {
 	hosts.Lock()
 	defer hosts.Unlock()
 	readHosts()
@@ -204,7 +206,7 @@ func lookupStaticHost(host string) []string {
 }
 
 // lookupStaticAddr looks up the hosts for the given address from /etc/hosts.
-func lookupStaticAddr(addr string) []string {
+func LookupStaticAddr(addr string) []string {
 	hosts.Lock()
 	defer hosts.Unlock()
 	readHosts()
