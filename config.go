@@ -65,22 +65,21 @@ func MakeServerFromString(input []byte) (*Server, error) {
 			return nil, errors.Errorf("resolver %q expected", name)
 		}
 
+		var res Resolver
 		switch jr.Type {
 		case "hosts":
-			return &HostsResolver{Name: name}, nil
+			res = &HostsResolver{Name: name}
 		case "leaf":
 			remote, err := net.ResolveUDPAddr("udp", jr.Addr)
 			if err != nil {
 				return nil, errors.Wrapf(err, "bad addr for resolver %v", jr)
 			}
-			res := &RemoteBindedUDPResolver{
+			res = &RemoteBindedUDPResolver{
 				Name:        name,
 				Remote:      remote,
 				UDPResolver: &s.UDPResolver,
 			}
-			name2resolver[name] = res
-			return res, nil
-		case "gfw-filter":
+		case "gfw-filter", "cache":
 			parents[name] = struct{}{}
 			child, err := loadResolver(jr.Child)
 			delete(parents, name)
@@ -88,9 +87,12 @@ func MakeServerFromString(input []byte) (*Server, error) {
 				return nil, err
 			}
 
-			res := &GFWFilterResolver{Child: child, Name: name}
-			name2resolver[name] = res
-			return res, nil
+			switch jr.Type {
+			case "gfw-filter":
+				res = &GFWFilterResolver{Name: name, Child: child}
+			case "cache":
+				res = &CacheResolver{Name: name, Child: child}
+			}
 		case "parallel", "chain":
 			children := make([]Resolver, 0)
 			var err error
@@ -113,15 +115,18 @@ func MakeServerFromString(input []byte) (*Server, error) {
 
 			switch jr.Type {
 			case "parallel":
-				return &ParallelResolver{Name: name, Children: children}, nil
+				res = &ParallelResolver{Name: name, Children: children}
 			case "chain":
-				return &ChainResolver{Name: name, Children: children}, nil
+				res = &ChainResolver{Name: name, Children: children}
 			}
-			panic("unreachable")
 		default:
 			return nil, errors.Errorf("unknown resolver: %v", jr)
 		}
-	}
+
+		// ok
+		name2resolver[name] = res
+		return res, nil
+	} // func loadResolver
 
 	s.RootResolver, err = loadResolver("root")
 	if err != nil {

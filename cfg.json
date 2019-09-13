@@ -21,7 +21,8 @@
         "114-filter", "ali-filter", "dnspod-filter"
       ]
     },
+    {"name": "cache", "type": "cache", "child": "external"},
     {"name": "hosts", "type": "hosts"},
-    {"name": "root", "type": "chain", "children": ["hosts", "external"]}
+    {"name": "root", "type": "chain", "children": ["hosts", "cache"]}
   ]
 }
