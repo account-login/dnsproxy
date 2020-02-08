@@ -27,6 +27,7 @@ func MakeServerFromString(input []byte) (*Server, error) {
 		Listen    string         `json:"listen"`
 		TimeoutMS int64          `json:"timeout_ms"`
 		Resolvers []jsonResolver `json:"resolvers"`
+		GFWIPList []string       `json:"gfw_ip_list"`
 	}
 
 	cfg := jsonConfig{}
@@ -89,7 +90,11 @@ func MakeServerFromString(input []byte) (*Server, error) {
 
 			switch jr.Type {
 			case "gfw-filter":
-				res = &GFWFilterResolver{Name: name, Child: child}
+				resolver := GFWFilterResolver{Name: name, Child: child}
+				for _, ipaddr := range cfg.GFWIPList {
+					resolver.AddBlackIP(ipaddr)
+				}
+				res = &resolver
 			case "cache":
 				res = &CacheResolver{Name: name, Child: child}
 			}

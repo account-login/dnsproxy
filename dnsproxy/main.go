@@ -23,7 +23,6 @@ import (
 
 // TODO: rtt metric
 // TODO: tcp resolver
-// TODO: cache
 // TODO: adblock
 // TODO: ipv6 pollution
 // FIXME: dnsmessage.Message.Pack() is not thread safe
