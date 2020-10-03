@@ -24,5 +24,6 @@
     {"name": "cache", "type": "cache", "child": "external"},
     {"name": "hosts", "type": "hosts"},
     {"name": "root", "type": "chain", "children": ["hosts", "cache"]}
-  ]
+  ],
+  "gfw_ip_list": []
 }
