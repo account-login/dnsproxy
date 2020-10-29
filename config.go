@@ -22,6 +22,10 @@ func MakeServerFromString(input []byte) (*Server, error) {
 		Addr     string   `json:"addr,omitempty"`
 		Child    string   `json:"child,omitempty"`
 		Children []string `json:"children,omitempty"`
+		// for CNResolver
+		CNList []string `json:"cn_list,omitemtpy"`
+		AbList []string `json:"ab_list,omitemtpy"`
+		MaxTTL uint32   `json:"max_ttl,omitemtpy"`
 	}
 	type jsonConfig struct {
 		Listen    string         `json:"listen"`
@@ -66,6 +70,22 @@ func MakeServerFromString(input []byte) (*Server, error) {
 			return nil, errors.Errorf("resolver %q expected", name)
 		}
 
+		loadChildren := func(childNameList []string) ([]Resolver, error) {
+			var children []Resolver
+			parents[name] = struct{}{}
+			for _, childName := range childNameList {
+				var child Resolver
+				child, err = loadResolver(childName)
+				if err != nil {
+					return nil, err
+				}
+
+				children = append(children, child)
+			}
+			delete(parents, name)
+			return children, nil
+		}
+
 		var res Resolver
 		switch jr.Type {
 		case "hosts":
@@ -99,21 +119,7 @@ func MakeServerFromString(input []byte) (*Server, error) {
 				res = &CacheResolver{Name: name, Child: child}
 			}
 		case "parallel", "chain":
-			children := make([]Resolver, 0)
-			var err error
-
-			parents[name] = struct{}{}
-			for _, childName := range jr.Children {
-				var child Resolver
-				child, err = loadResolver(childName)
-				if err != nil {
-					break
-				}
-
-				children = append(children, child)
-			}
-			delete(parents, name)
-
+			children, err := loadChildren(jr.Children)
 			if err != nil {
 				return nil, err
 			}
@@ -124,6 +130,27 @@ func MakeServerFromString(input []byte) (*Server, error) {
 			case "chain":
 				res = &ChainResolver{Name: name, Children: children}
 			}
+		case "cn":
+			CNList, err := loadChildren(jr.CNList)
+			if err != nil {
+				return nil, err
+			}
+			AbList, err := loadChildren(jr.AbList)
+			if err != nil {
+				return nil, err
+			}
+
+			resolver := CNResolver{
+				Name:    name,
+				CNList:  CNList,
+				AbList:  AbList,
+				Timeout: s.Timeout,
+				MaxTTL:  jr.MaxTTL,
+			}
+			for _, ipaddr := range cfg.GFWIPList {
+				resolver.AddBlackIP(ipaddr)
+			}
+			res = &resolver
 		default:
 			return nil, errors.Errorf("unknown resolver: %v", jr)
 		}

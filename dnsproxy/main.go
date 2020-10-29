@@ -161,7 +161,7 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 			res, err := server.RootResolver.Resolve(ctx, m)
 			if err != nil {
 				ctxlog.Errorf(ctx, "server.RootResolver.Resolve: %v", err)
-				return
+				return // TODO: reply client
 			}
 
 			// log

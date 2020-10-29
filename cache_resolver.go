@@ -65,11 +65,7 @@ func reqShouldCache(req *dm.Message) bool {
 	return typ == dm.TypeA || typ == dm.TypeAAAA || typ == dm.TypeALL
 }
 
-func (r *CacheResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message, error) {
-	if !reqShouldCache(req) {
-		return r.Child.Resolve(ctx, req)
-	}
-
+func (r *CacheResolver) get(req *dm.Message) (cacheItem, bool) {
 	nowNs := time.Now().UnixNano()
 	key := fmt.Sprintf("%d:%s", req.Questions[0].Type, req.Questions[0].Name)
 
@@ -88,10 +84,46 @@ func (r *CacheResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Messa
 		// id
 		item.res.ID = req.ID
 		// update TTL
-		newTTL := (r.cache[key].expireNs - nowNs) / 1e9
+		newTTL := (item.expireNs - nowNs) / 1e9
 		for i := range item.res.Answers {
-			item.res.Answers[i].Header.TTL = uint32(newTTL)
+			item.res.Answers[i].Header.TTL = uint32(newTTL) // FIXME: race
 		}
+	}
+
+	return item, ok
+}
+
+func (r *CacheResolver) set(req *dm.Message, res *dm.Message) {
+	if len(res.Answers) == 0 {
+		return // negative response, or uncommon type. not worth caching
+	}
+
+	nowNs := time.Now().UnixNano()
+	key := fmt.Sprintf("%d:%s", req.Questions[0].Type, req.Questions[0].Name)
+
+	// FIXME: assume TTL is same for all answers
+	expireNs := nowNs + int64(res.Answers[0].Header.TTL)*1e9
+
+	r.mu.Lock()
+	if r.cache == nil {
+		r.cache = map[string]cacheItem{}
+	}
+	r.cache[key] = cacheItem{expireNs: expireNs, res: *res}
+	heap.Push(&r.heap, heapItem{expireNs: expireNs, key: key})
+	r.mu.Unlock()
+}
+
+func (r *CacheResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message, error) {
+	if !reqShouldCache(req) {
+		return r.Child.Resolve(ctx, req)
+	}
+
+	item, ok := r.get(req)
+
+	// hit
+	if ok {
+		key := fmt.Sprintf("%d:%s", req.Questions[0].Type, req.Questions[0].Name)
+		newTTL := item.res.Answers[0].Header.TTL
 		ctxlog.Debugf(ctx, "cache hit: [key:%s][ttl:%v]", key, newTTL)
 		return &item.res, nil
 	}
@@ -104,16 +136,7 @@ func (r *CacheResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Messa
 
 	// write cache
 	if len(res.Answers) > 0 && res.Answers[0].Header.TTL > 0 {
-		// assume TTL is same for all answers
-		expireNs := nowNs + int64(res.Answers[0].Header.TTL)*1e9
-
-		r.mu.Lock()
-		if r.cache == nil {
-			r.cache = map[string]cacheItem{}
-		}
-		r.cache[key] = cacheItem{expireNs: expireNs, res: *res}
-		heap.Push(&r.heap, heapItem{expireNs: expireNs, key: key})
-		r.mu.Unlock()
+		r.set(req, res)
 	}
 
 	return res, err
