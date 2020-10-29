@@ -16,3 +16,4 @@ bin
 .idea
 delegated-apnic-extended-latest
 cn.txt
+*.ZIP
