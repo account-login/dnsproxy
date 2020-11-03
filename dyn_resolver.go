@@ -38,10 +38,9 @@ type dynItem struct {
 	// input
 	Name string
 	Addr string
-	TTL  uint32 `json:"TTL,omitempty"`
+	TTL  uint32
 	// stats
-	// us
-	Updated uint64 `json:"Updated,omitempty"`
+	Updated uint64 // in us
 }
 
 type dynConfig struct {

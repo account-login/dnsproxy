@@ -21,16 +21,16 @@ func MakeServerFromString(input []byte) (*Server, error) {
 	type jsonResolver struct {
 		Name     string   `json:"name"`
 		Type     string   `json:"type"`
-		Addr     string   `json:"addr,omitempty"`
-		Child    string   `json:"child,omitempty"`
-		Children []string `json:"children,omitempty"`
+		Addr     string   `json:"addr"`
+		Child    string   `json:"child"`
+		Children []string `json:"children"`
 		// for CNResolver
-		CNList []string `json:"cn_list,omitempty"`
-		AbList []string `json:"ab_list,omitempty"`
-		MaxTTL uint32   `json:"max_ttl,omitempty"`
+		CNList []string `json:"cn_list"`
+		AbList []string `json:"ab_list"`
+		MaxTTL uint32   `json:"max_ttl"`
 		// for DynResolver
-		DBPath   string `json:"db_path,omitempty"`
-		HTTPAddr string `json:"http_addr,omitempty"`
+		DBPath   string `json:"db_path"`
+		HTTPAddr string `json:"http_addr"`
 	}
 	type jsonConfig struct {
 		Listen    string         `json:"listen"`
