@@ -303,7 +303,7 @@ func (r *DynResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message
 		Header: dm.Header{
 			ID: req.ID,
 			// flags
-			Authoritative: true, Response: true, RecursionAvailable: true,
+			Authoritative: true, Response: true, RecursionDesired: true,
 		},
 		Questions: req.Questions,
 		Answers:   rrList,

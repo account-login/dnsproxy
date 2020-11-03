@@ -136,6 +136,7 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 				continue
 			}
 		}
+		ctx = ctxlog.Pushf(ctx, "[client:%v]", addr)
 
 		// parse req
 		m := &dnsmessage.Message{}
