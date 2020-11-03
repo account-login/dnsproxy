@@ -240,12 +240,16 @@ func resolveDB(ctx context.Context, r *DynResolver, q *dm.Question, rrList []dm.
 		}
 
 		r.mu.Lock()
-		ip4 := r.name2ip4[string(qname)]
+		ip4 := r.name2ip4[string(qname)].To4()
 		ip6 := r.name2ip6[string(qname)]
 		ttl := r.name2ttl[string(qname)]
 		r.mu.Unlock()
 
 		for _, ip := range [2]net.IP{ip4, ip6} {
+			if ip == nil {
+				continue
+			}
+
 			var ipType dm.Type
 			if ip.To4() != nil {
 				ipType = dm.TypeA
@@ -271,11 +275,11 @@ func resolveDB(ctx context.Context, r *DynResolver, q *dm.Question, rrList []dm.
 			case dm.TypeA:
 				rb := &dm.AResource{}
 				rr.Body = rb
-				copy(rb.A[:], ip.To4())
+				copy(rb.A[:], ip)
 			case dm.TypeAAAA:
 				rb := &dm.AAAAResource{}
 				rr.Body = rb
-				copy(rb.AAAA[:], ip.To16())
+				copy(rb.AAAA[:], ip)
 			}
 
 			rrList = append(rrList, rr)
