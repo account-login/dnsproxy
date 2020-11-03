@@ -17,3 +17,5 @@ bin
 delegated-apnic-extended-latest
 cn.txt
 *.ZIP
+cn.json
+dyn.db

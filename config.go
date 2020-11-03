@@ -1,7 +1,9 @@
 package dnsproxy
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/account-login/ctxlog"
 	"github.com/pkg/errors"
 	"net"
 	"time"
@@ -23,9 +25,12 @@ func MakeServerFromString(input []byte) (*Server, error) {
 		Child    string   `json:"child,omitempty"`
 		Children []string `json:"children,omitempty"`
 		// for CNResolver
-		CNList []string `json:"cn_list,omitemtpy"`
-		AbList []string `json:"ab_list,omitemtpy"`
-		MaxTTL uint32   `json:"max_ttl,omitemtpy"`
+		CNList []string `json:"cn_list,omitempty"`
+		AbList []string `json:"ab_list,omitempty"`
+		MaxTTL uint32   `json:"max_ttl,omitempty"`
+		// for DynResolver
+		DBPath   string `json:"db_path,omitempty"`
+		HTTPAddr string `json:"http_addr,omitempty"`
 	}
 	type jsonConfig struct {
 		Listen    string         `json:"listen"`
@@ -149,6 +154,18 @@ func MakeServerFromString(input []byte) (*Server, error) {
 			}
 			for _, ipaddr := range cfg.GFWIPList {
 				resolver.AddBlackIP(ipaddr)
+			}
+			res = &resolver
+		case "dyn":
+			resolver := DynResolver{
+				Name:     jr.Name,
+				DBPath:   jr.DBPath,
+				HTTPAddr: jr.HTTPAddr,
+			}
+			ctx := context.Background()
+			if err = resolver.StartHTTP(ctx); err != nil {
+				ctxlog.Errorf(ctx, "DynResolver.StartHTTP() error: %v", err)
+				// ignore err
 			}
 			res = &resolver
 		default:
