@@ -300,8 +300,13 @@ func (r *DynResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message
 	}
 
 	m := &dm.Message{
-		Header:  dm.Header{ID: req.ID, Response: true, RecursionAvailable: true},
-		Answers: rrList,
+		Header: dm.Header{
+			ID: req.ID,
+			// flags
+			Authoritative: true, Response: true, RecursionAvailable: true,
+		},
+		Questions: req.Questions,
+		Answers:   rrList,
 	}
 	return m, nil
 }
