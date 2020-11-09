@@ -7,6 +7,7 @@ import (
 	"flag"
 	"github.com/account-login/ctxlog"
 	"github.com/account-login/dnsproxy"
+	"github.com/account-login/dnsproxy/dns"
 	"golang.org/x/net/dns/dnsmessage"
 	"io"
 	"io/ioutil"
@@ -117,13 +118,19 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 	defer server.UDPResolver.Wait()
 	defer server.UDPResolver.Stop()
 
+	conn := state.conn.(*net.UDPConn)
+	if err := dns.SetSessionUDPOptions(conn); err != nil {
+		ctxlog.Errorf(ctx, "dns.SetSessionUDPOptions: %v", err)
+		// ignore err
+	}
+
 	// loop for udp client
 	buf := make([]byte, 64*1024)
 	for {
 		ctx := ctxlog.Pushf(ctx, "[session:%v]", atomic.AddUint64(&state.session, 1))
 
 		// read from client
-		n, addr, err := state.conn.ReadFrom(buf)
+		n, sess, err := dns.ReadFromSessionUDP(conn, buf)
 		if err == io.EOF {
 			ctxlog.Infof(ctx, "server eof")
 			break
@@ -136,7 +143,7 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 				continue
 			}
 		}
-		ctx = ctxlog.Pushf(ctx, "[client:%v]", addr)
+		ctx = ctxlog.Pushf(ctx, "[client:%v]", sess.RemoteAddr())
 
 		// parse req
 		m := &dnsmessage.Message{}
@@ -152,7 +159,7 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 
 		// resolve and reply
 		state.inc()
-		go func(addr net.Addr) {
+		go func(sess *dns.SessionUDP) {
 			defer state.dec()
 
 			ctx, cancel := context.WithTimeout(ctx, server.Timeout)
@@ -176,12 +183,12 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 			}
 
 			// reply client
-			_, err = state.conn.WriteTo(buf, addr)
+			_, err = dns.WriteToSessionUDP(conn, buf, sess)
 			if err != nil {
 				ctxlog.Errorf(ctx, "conn.WriteTo(): %v", err)
 				return
 			}
-		}(addr)
+		}(sess)
 	} // loop for req
 }
 
