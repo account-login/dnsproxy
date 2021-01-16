@@ -34,6 +34,7 @@ func MakeServerFromString(input []byte) (*Server, error) {
 		HTTPSAddr string `json:"https_addr"`
 		TLSCertFile string `json:"tls_cert_file"`
 		TLSKeyFile string `json:"tls_key_file"`
+		TLSClientCAFile string `json:"tls_client_ca_file"`
 	}
 	type jsonConfig struct {
 		Listen    string         `json:"listen"`
@@ -167,6 +168,7 @@ func MakeServerFromString(input []byte) (*Server, error) {
 				HTTPSAddr: jr.HTTPSAddr,
 				TLSCertFile: jr.TLSCertFile,
 				TLSKeyFile: jr.TLSKeyFile,
+				TLSClientCAFile: jr.TLSClientCAFile,
 			}
 			ctx := context.Background()
 			if err = resolver.StartHTTP(ctx); err != nil {

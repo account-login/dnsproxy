@@ -3,9 +3,12 @@ package dnsproxy
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"github.com/account-login/ctxlog"
+	"github.com/pkg/errors"
 	dm "golang.org/x/net/dns/dnsmessage"
 	"io/ioutil"
 	"net"
@@ -18,12 +21,14 @@ import (
 )
 
 type DynResolver struct {
-	Name        string
-	DBPath      string
-	HTTPAddr    string
-	HTTPSAddr   string
-	TLSCertFile string
-	TLSKeyFile  string
+	Name      string
+	DBPath    string
+	HTTPAddr  string
+	HTTPSAddr string
+	// tls
+	TLSCertFile     string
+	TLSKeyFile      string
+	TLSClientCAFile string	// for client auth
 	// private
 	mu       sync.Mutex
 	ts       time.Time
@@ -361,7 +366,6 @@ func (r *DynResolver) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	response(rw, 0, "OK")
 }
 
-// TODO: client cert
 func (r *DynResolver) StartHTTP(ctx context.Context) error {
 	go func() {
 		if r.HTTPAddr == "" {
@@ -376,18 +380,39 @@ func (r *DynResolver) StartHTTP(ctx context.Context) error {
 			ctxlog.Errorf(ctx, "DynResolver.StartHTTP: %v", err)
 		}
 	}()
-	go func() {
+
+	// https://youngkin.github.io/post/gohttpsclientserver/
+	doHTTPS := func() error {
 		if r.HTTPSAddr == "" {
-			return
+			return nil
+		}
+
+		tlsConf := &tls.Config{}
+		if r.TLSCertFile != "" {
+			caCert, err := ioutil.ReadFile(r.TLSClientCAFile)
+			if err != nil {
+				return errors.Wrap(err, "open client ca file")
+			}
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(caCert)
+			tlsConf.ClientCAs = caCertPool
+			tlsConf.ClientAuth = tls.RequireAndVerifyClientCert
 		}
 		server := http.Server{
-			Addr:    r.HTTPSAddr,
-			Handler: r,
+			Addr:      r.HTTPSAddr,
+			Handler:   r,
+			TLSConfig: tlsConf,
 		}
-		err := server.ListenAndServeTLS(r.TLSCertFile, r.TLSKeyFile)
-		if err != nil {
-			ctxlog.Errorf(ctx, "DynResolver.ListenAndServeTLS: %v", err)
+		if err := server.ListenAndServeTLS(r.TLSCertFile, r.TLSKeyFile); err != nil {
+			return errors.Wrap(err, "ListenAndServeTLS")
+		}
+		return nil
+	}
+	go func() {
+		if err := doHTTPS(); err != nil {
+			ctxlog.Errorf(ctx, "DynResolver.https: %v", err)
 		}
 	}()
+
 	return nil
 }

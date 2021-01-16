@@ -13,7 +13,8 @@
       "name": "dyn", "type": "dyn", "db_path": "dyn.db",
       "http_addr": ":54", "https_addr": ":55",
       "tls_cert_file": "fullchain.pem",
-      "tls_key_file": "privkey.pem"
+      "tls_key_file": "privkey.pem",
+      "tls_client_ca_file": "out/dnsproxy_ca.crt"
     },
     {"name": "hosts", "type": "hosts"},
     {"name": "root", "type": "chain", "children": ["hosts", "dyn", "cache"]}
