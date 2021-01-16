@@ -18,9 +18,12 @@ import (
 )
 
 type DynResolver struct {
-	Name     string
-	DBPath   string
-	HTTPAddr string
+	Name        string
+	DBPath      string
+	HTTPAddr    string
+	HTTPSAddr   string
+	TLSCertFile string
+	TLSKeyFile  string
 	// private
 	mu       sync.Mutex
 	ts       time.Time
@@ -358,21 +361,32 @@ func (r *DynResolver) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	response(rw, 0, "OK")
 }
 
-// TODO: https and client cert
+// TODO: client cert
 func (r *DynResolver) StartHTTP(ctx context.Context) error {
-	if r.HTTPAddr == "" {
-		return nil
-	}
-
-	server := http.Server{
-		Addr:    r.HTTPAddr,
-		Handler: r,
-	}
-
 	go func() {
+		if r.HTTPAddr == "" {
+			return
+		}
+		server := http.Server{
+			Addr:    r.HTTPAddr,
+			Handler: r,
+		}
 		err := server.ListenAndServe()
 		if err != nil {
 			ctxlog.Errorf(ctx, "DynResolver.StartHTTP: %v", err)
+		}
+	}()
+	go func() {
+		if r.HTTPSAddr == "" {
+			return
+		}
+		server := http.Server{
+			Addr:    r.HTTPSAddr,
+			Handler: r,
+		}
+		err := server.ListenAndServeTLS(r.TLSCertFile, r.TLSKeyFile)
+		if err != nil {
+			ctxlog.Errorf(ctx, "DynResolver.ListenAndServeTLS: %v", err)
 		}
 	}()
 	return nil

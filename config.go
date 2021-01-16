@@ -31,6 +31,9 @@ func MakeServerFromString(input []byte) (*Server, error) {
 		// for DynResolver
 		DBPath   string `json:"db_path"`
 		HTTPAddr string `json:"http_addr"`
+		HTTPSAddr string `json:"https_addr"`
+		TLSCertFile string `json:"tls_cert_file"`
+		TLSKeyFile string `json:"tls_key_file"`
 	}
 	type jsonConfig struct {
 		Listen    string         `json:"listen"`
@@ -161,6 +164,9 @@ func MakeServerFromString(input []byte) (*Server, error) {
 				Name:     jr.Name,
 				DBPath:   jr.DBPath,
 				HTTPAddr: jr.HTTPAddr,
+				HTTPSAddr: jr.HTTPSAddr,
+				TLSCertFile: jr.TLSCertFile,
+				TLSKeyFile: jr.TLSKeyFile,
 			}
 			ctx := context.Background()
 			if err = resolver.StartHTTP(ctx); err != nil {

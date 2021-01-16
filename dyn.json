@@ -1,5 +1,5 @@
 {
-  "listen": ":53",
+  "listen": ":5353",
   "timeout_ms": 500,
   "resolvers": [
     {"name": "8888", "type": "leaf", "addr": "8.8.8.8:53"},
@@ -9,7 +9,12 @@
       "children": ["8888", "1111"]
     },
     {"name": "cache", "type": "cache", "child": "external"},
-    {"name": "dyn", "type": "dyn", "db_path": "dyn.db", "http_addr": ":54"},
+    {
+      "name": "dyn", "type": "dyn", "db_path": "dyn.db",
+      "http_addr": ":54", "https_addr": ":55",
+      "tls_cert_file": "fullchain.pem",
+      "tls_key_file": "privkey.pem"
+    },
     {"name": "hosts", "type": "hosts"},
     {"name": "root", "type": "chain", "children": ["hosts", "dyn", "cache"]}
   ],

@@ -19,3 +19,4 @@ cn.txt
 *.ZIP
 cn.json
 dyn.db
+*.pem
