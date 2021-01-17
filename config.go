@@ -29,12 +29,13 @@ func MakeServerFromString(input []byte) (*Server, error) {
 		AbList []string `json:"ab_list"`
 		MaxTTL uint32   `json:"max_ttl"`
 		// for DynResolver
-		DBPath   string `json:"db_path"`
-		HTTPAddr string `json:"http_addr"`
-		HTTPSAddr string `json:"https_addr"`
-		TLSCertFile string `json:"tls_cert_file"`
-		TLSKeyFile string `json:"tls_key_file"`
-		TLSClientCAFile string `json:"tls_client_ca_file"`
+		DBPath          string   `json:"db_path"`
+		Suffixes        []string `json:"suffixes"`
+		HTTPAddr        string   `json:"http_addr"`
+		HTTPSAddr       string   `json:"https_addr"`
+		TLSCertFile     string   `json:"tls_cert_file"`
+		TLSKeyFile      string   `json:"tls_key_file"`
+		TLSClientCAFile string   `json:"tls_client_ca_file"`
 	}
 	type jsonConfig struct {
 		Listen    string         `json:"listen"`
@@ -162,12 +163,13 @@ func MakeServerFromString(input []byte) (*Server, error) {
 			res = &resolver
 		case "dyn":
 			resolver := DynResolver{
-				Name:     jr.Name,
-				DBPath:   jr.DBPath,
-				HTTPAddr: jr.HTTPAddr,
-				HTTPSAddr: jr.HTTPSAddr,
-				TLSCertFile: jr.TLSCertFile,
-				TLSKeyFile: jr.TLSKeyFile,
+				Name:            jr.Name,
+				DBPath:          jr.DBPath,
+				Suffixies:       jr.Suffixes,
+				HTTPAddr:        jr.HTTPAddr,
+				HTTPSAddr:       jr.HTTPSAddr,
+				TLSCertFile:     jr.TLSCertFile,
+				TLSKeyFile:      jr.TLSKeyFile,
 				TLSClientCAFile: jr.TLSClientCAFile,
 			}
 			ctx := context.Background()

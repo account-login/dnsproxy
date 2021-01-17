@@ -1,7 +1,6 @@
 package dnsproxy
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -21,14 +20,17 @@ import (
 )
 
 type DynResolver struct {
-	Name      string
-	DBPath    string
+	Name   string
+	DBPath string
+	// return empty answer if domain name matches suffix, to prevent loop
+	Suffixies []string
+	// update api
 	HTTPAddr  string
 	HTTPSAddr string
 	// tls
 	TLSCertFile     string
 	TLSKeyFile      string
-	TLSClientCAFile string	// for client auth
+	TLSClientCAFile string // for client auth
 	// private
 	mu       sync.Mutex
 	ts       time.Time
@@ -155,6 +157,8 @@ func updateDB(ctx context.Context, r *DynResolver, name string, ip net.IP, ttl u
 	ctx = ctxlog.Pushf(ctx, "[updateDB][name:%s][ip:%s]", name, ip)
 	ctxlog.Infof(ctx, "[ttl:%v]", ttl)
 
+	// TODO: verify that name matches suffix
+
 	_ = reloadDB(ctx, r)
 
 	r.mu.Lock()
@@ -242,15 +246,12 @@ func resolveDB(ctx context.Context, r *DynResolver, q *dm.Question, rrList []dm.
 
 	switch q.Type {
 	case dm.TypeA, dm.TypeAAAA, dm.TypeALL:
-		qname := bytes.ToLower(q.Name.Data[:q.Name.Length])
-		if len(qname) > 0 && qname[len(qname)-1] == '.' {
-			qname = qname[:len(qname)-1]
-		}
+		qname := domainNormalize(string(q.Name.Data[:q.Name.Length]))
 
 		r.mu.Lock()
-		ip4 := r.name2ip4[string(qname)].To4()
-		ip6 := r.name2ip6[string(qname)]
-		ttl := r.name2ttl[string(qname)]
+		ip4 := r.name2ip4[qname].To4()
+		ip6 := r.name2ip6[qname]
+		ttl := r.name2ttl[qname]
 		r.mu.Unlock()
 
 		for _, ip := range [2]net.IP{ip4, ip6} {
@@ -297,19 +298,41 @@ func resolveDB(ctx context.Context, r *DynResolver, q *dm.Question, rrList []dm.
 	return rrList
 }
 
+func matchSuffix(r *DynResolver, req *dm.Message) bool {
+	for i := range req.Questions {
+		q := &req.Questions[i]
+		qname := domainNormalize(string(q.Name.Data[:q.Name.Length]))
+		for _, suf := range r.Suffixies {
+			if strings.HasSuffix(qname, "."+suf) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (r *DynResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message, error) {
 	var rrList []dm.Resource
 	for i := range req.Questions {
 		rrList = resolveDB(ctx, r, &req.Questions[i], rrList)
 	}
 
+	blockSuffix := false
 	if len(rrList) == 0 {
-		return nil, ErrNoResult
+		blockSuffix = matchSuffix(r, req)
+		if !blockSuffix {
+			return nil, ErrNoResult // next resolver
+		}
 	}
 
+	rcode := dm.RCodeSuccess
+	if blockSuffix {
+		rcode = dm.RCodeNameError
+	}
 	m := &dm.Message{
 		Header: dm.Header{
-			ID: req.ID,
+			ID:    req.ID,
+			RCode: rcode,
 			// flags
 			Authoritative: true, Response: true, RecursionDesired: true,
 		},
