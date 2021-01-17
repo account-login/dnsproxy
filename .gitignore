@@ -20,3 +20,5 @@ cn.txt
 cn.json
 dyn.db
 *.pem
+t*
+out*
