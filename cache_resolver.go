@@ -131,7 +131,7 @@ func (r *CacheResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Messa
 	// miss
 	res, err := r.Child.Resolve(ctx, req)
 	if err != nil {
-		return nil, err
+		return res, err
 	}
 
 	// write cache

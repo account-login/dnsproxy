@@ -30,6 +30,10 @@ func b2i(b bool) int {
 }
 
 func ReprMessageShort(m *dm.Message) (repr string) {
+	if m == nil {
+		return "(nil)"
+	}
+
 	repr += fmt.Sprintf("[ID:%v][OP:%v][RCode:%d]", m.ID, m.OpCode, m.RCode)
 	repr += "[flags:"
 	if m.Response {

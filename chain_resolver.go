@@ -18,15 +18,19 @@ func (r *ChainResolver) GetName() string {
 func (r *ChainResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message, error) {
 	ctx = ctxlog.Pushf(ctx, "[chain:%v]", r.Name)
 
+	var reply *dm.Message
 	for _, cr := range r.Children {
 		m, err := cr.Resolve(ctx, req)
 		if err != nil {
 			ctxlog.Debugf(ctx, "[child:%v] error: %v", cr.GetName(), err)
+			if reply == nil && m != nil {
+				reply = m // save error response for later reply
+			}
 			continue
 		}
 
 		return m, err
 	}
 
-	return nil, ErrNoResult
+	return reply, ErrNoResult
 }

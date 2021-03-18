@@ -5,7 +5,6 @@ import (
 	"github.com/account-login/ctxlog"
 	"github.com/pkg/errors"
 	dm "golang.org/x/net/dns/dnsmessage"
-	"sync/atomic"
 )
 
 type ParallelResolver struct {
@@ -18,39 +17,65 @@ var ErrNoResult = errors.New("no result selected")
 func (r *ParallelResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message, error) {
 	ctx = ctxlog.Pushf(ctx, "[parallel:%v]", r.Name)
 
-	ch := make(chan *dm.Message, 0)
-	remains := int32(len(r.Children))
-	for _, cr := range r.Children {
-		go func(cr Resolver) {
-			defer func() {
-				cur := atomic.AddInt32(&remains, -1)
-				if cur == 0 {
-					close(ch) // no result
-				}
-			}()
+	errs := make([]error, len(r.Children))
+	replies := make([]*dm.Message, len(r.Children))
+	notifify := make(chan int, 0)
 
-			res, err := cr.Resolve(ctx, req)
-			if err != nil {
-				ctxlog.Infof(ctx, "[child:%v] error: %v", cr.GetName(), err)
-				return
+	for idx := range r.Children {
+		go func(idx int) {
+			cr := r.Children[idx]
+			replies[idx], errs[idx] = cr.Resolve(ctx, req)
+			if errs[idx] != nil {
+				ctxlog.Infof(ctx, "[child:%v] error: %v", cr.GetName(), errs[idx])
 			}
-
-			select {
-			case ch <- res:
-				ctxlog.Debugf(ctx, "[picked:%v]", cr.GetName())
-			default:
-				// pass
-			}
-		}(cr)
+			notifify <- idx
+		}(idx)
 	}
 
-	res := <-ch
-	if res == nil {
-		ctxlog.Debugf(ctx, "no result")
-		return nil, ErrNoResult
-	} else {
-		return res, nil
+	done := make([]bool, len(r.Children))
+	for idx := range notifify {
+		done[idx] = true
+
+		doneCnt := 0
+		cls2 := -1
+		cls3 := -1
+		for idx, ok := range done {
+			if !ok {
+				continue
+			}
+
+			// the first non-empty reply
+			if errs[idx] == nil && len(replies[idx].Answers) > 0 {
+				ctxlog.Debugf(ctx, "[picked:%v]", r.Children[idx].GetName())
+				return replies[idx], nil
+			}
+			// empty reply
+			if cls2 < 0 && errs[idx] == nil {
+				cls2 = idx
+			}
+			// error reply
+			if cls3 < 0 && replies[idx] != nil {
+				cls3 = idx
+			}
+
+			doneCnt++
+		}
+
+		if doneCnt == len(r.Children) {
+			// all kids done
+			var reply *dm.Message
+			if cls3 >= 0 {
+				reply = replies[cls3]
+			}
+			if cls2 >= 0 {
+				reply = replies[cls2]
+			}
+
+			ctxlog.Debugf(ctx, "no result")
+			return reply, ErrNoResult
+		}
 	}
+	panic("Unreachable")
 }
 
 func (r *ParallelResolver) GetName() string {

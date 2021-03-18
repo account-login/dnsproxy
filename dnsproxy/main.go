@@ -5,10 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"flag"
-	"github.com/account-login/ctxlog"
-	"github.com/account-login/dnsproxy"
-	"github.com/account-login/dnsproxy/dns"
-	"golang.org/x/net/dns/dnsmessage"
 	"io"
 	"io/ioutil"
 	"log"
@@ -20,6 +16,11 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+
+	"github.com/account-login/ctxlog"
+	"github.com/account-login/dnsproxy"
+	"github.com/account-login/dnsproxy/dns"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 // TODO: rtt metric
@@ -113,6 +114,18 @@ func initUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 	ctxlog.Infof(ctx, "udp server listening on %v", state.conn.LocalAddr())
 }
 
+func errReply(req *dnsmessage.Message) *dnsmessage.Message {
+	return &dnsmessage.Message{
+		Header: dnsmessage.Header{
+			ID:    req.ID,
+			RCode: dnsmessage.RCodeNameError,
+			// flags
+			Authoritative: false, Response: true, RecursionDesired: true,
+		},
+		Questions: req.Questions,
+	}
+}
+
 func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 	defer state.dec()
 	defer server.UDPResolver.Wait()
@@ -169,11 +182,15 @@ func doUDP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 			res, err := server.RootResolver.Resolve(ctx, m)
 			if err != nil {
 				ctxlog.Errorf(ctx, "server.RootResolver.Resolve: %v", err)
-				return // TODO: reply client
 			}
 
 			// log
 			ctxlog.Infof(ctx, "res: %v", dnsproxy.ReprMessageShort(res))
+
+			// generate error reply
+			if res == nil {
+				res = errReply(m)
+			}
 
 			// pack result
 			buf, err := res.Pack()
@@ -274,11 +291,15 @@ func doTCP(ctx context.Context, server *dnsproxy.Server, state *serverState) {
 					res, err := server.RootResolver.Resolve(ctx, m)
 					if err != nil {
 						ctxlog.Errorf(ctx, "server.RootResolver.Resolve: %v", err)
-						return
 					}
 
 					// log
 					ctxlog.Infof(ctx, "res: %v", dnsproxy.ReprMessageShort(res))
+
+					// generate error reply
+					if res == nil {
+						res = errReply(m)
+					}
 
 					// pack result
 					rpack := buf[:2]

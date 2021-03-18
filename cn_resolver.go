@@ -249,12 +249,12 @@ func (r *CNResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message,
 	}
 
 	// only cancelled after all children were done
-	childCtx, childCacel := context.WithTimeout(context.Background(), r.Timeout)
+	childCtx, childCancel := context.WithTimeout(context.Background(), r.Timeout)
 	childCtx = ctxlog.Push(childCtx, ctxlog.Ctx(ctx))
 	childRemains := int32(len(r.CNList) + len(r.AbList))
 	childDone := func() {
 		if 0 == atomic.AddInt32(&childRemains, -1) {
-			childCacel()
+			childCancel()
 		}
 	}
 	childFunc := func(i int, resolver Resolver) {
@@ -289,7 +289,7 @@ func (r *CNResolver) Resolve(ctx context.Context, req *dm.Message) (*dm.Message,
 		cnctx.mu.Unlock()
 	}
 	if cnctx.idx < 0 {
-		return nil, ErrNoResult
+		return nil, ErrNoResult // TODO: select a error response
 	}
 	_ = fixMaxTTL(r.MaxTTL, cnctx.res[cnctx.idx])
 	return cnctx.res[cnctx.idx], cnctx.err[cnctx.idx]
